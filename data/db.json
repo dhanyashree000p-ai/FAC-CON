@@ -394,6 +394,19 @@
       "account_status": "active",
       "demo_account": false,
       "created_at": "2026-10-21T13:45:34.743Z"
+    },
+    {
+      "student_id": "STU0032",
+      "student_name": "Priya",
+      "usn": "1VA25CI089",
+      "dob": "2005-01-20",
+      "department_id": "DEPT001",
+      "semester": 5,
+      "section": "B",
+      "profile_pic": "/avatars/placeholder.png",
+      "account_status": "active",
+      "demo_account": false,
+      "created_at": "2026-10-21T14:27:17.327Z"
     }
   ],
   "faculty": [
@@ -2553,6 +2566,22 @@
       "meeting_outcome": "",
       "cabin_location_snapshot": "D Block, Second Floor, Room 207",
       "created_at": "2026-10-21T13:53:51.226Z"
+    },
+    {
+      "appointment_id": "APTIDMVI7JD5OBERK",
+      "student_id": "STU0032",
+      "faculty_id": "FAC0001",
+      "reason_id": "RSN004",
+      "custom_reason": "",
+      "appointment_date": "2026-10-27",
+      "start_time": "13:15",
+      "end_time": "13:30",
+      "student_message": "Faculty message: ",
+      "appointment_status": "pending_student_confirmation",
+      "initiated_by": "faculty",
+      "meeting_outcome": "",
+      "cabin_location_snapshot": "C Block, Ground Floor, Room 208",
+      "created_at": "2026-10-21T14:28:34.524Z"
     }
   ],
   "reports": [
@@ -2774,6 +2803,16 @@
       "msg": "Dhanyashree P (1VA25CI035) booked a consultation slot on 2026-10-22 at 13:45.",
       "at": "2026-10-21T13:53:51.226Z",
       "read": false
+    },
+    {
+      "id": "NOTIDMVI7JD5OGEGC",
+      "to_role": "student",
+      "to_id": "STU0032",
+      "apt": "APTIDMVI7JD5OBERK",
+      "type": "faculty_invitation",
+      "msg": "Dr. Kavitha Rao has invited you to a meeting regarding 'Personal Guidance' on 2026-10-27 at 13:15. Please review and respond.",
+      "at": "2026-10-21T14:28:34.524Z",
+      "read": false
     }
   ],
   "audit": [
@@ -2894,6 +2933,28 @@
         "faculty_id": "FAC0008",
         "appointment_date": "2026-10-22",
         "start_time": "13:45"
+      }
+    },
+    {
+      "id": "AUDIDMVI7HPLBQLX8",
+      "at": "2026-10-21T14:27:17.327Z",
+      "actor": "admin:ADM0001",
+      "action": "student_created",
+      "apt": "STU0032",
+      "meta": {
+        "usn": "1VA25CI089"
+      }
+    },
+    {
+      "id": "AUDIDMVI7JD5O0FY5",
+      "at": "2026-10-21T14:28:34.524Z",
+      "actor": "faculty:FAC0001",
+      "action": "meeting_invitation_created",
+      "apt": "APTIDMVI7JD5OBERK",
+      "meta": {
+        "student_id": "STU0032",
+        "appointment_date": "2026-10-27",
+        "start_time": "13:15"
       }
     }
   ]
