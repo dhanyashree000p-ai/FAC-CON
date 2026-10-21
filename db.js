@@ -1,5 +1,15 @@
+require('dotenv').config();
+const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
+
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+    })
+  : null;
+
 
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
@@ -39,22 +49,103 @@ function uid(prefix = 'ID') {
 }
 
 class Database {
+  
   constructor() {
     this.data = null;
     this.listeners = new Set();
-    this.init();
+    this.pendingSave = Promise.resolve();
+    this.initializing = false;
+    this.ready = this.init();
   }
 
-  init() {
-    if (fs.existsSync(DB_FILE)) {
-      try {
-        const raw = fs.readFileSync(DB_FILE, 'utf8');
-        this.data = JSON.parse(raw);
-        return;
-      } catch (err) {
-        console.error('Error reading existing db.json, re-seeding:', err);
+  async init() {
+    // Keep JSON storage for local development without Neon.
+    if (!pool) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+          'DATABASE_URL is required in production.'
+        );
       }
+
+      if (fs.existsSync(DB_FILE)) {
+        try {
+          const raw = fs.readFileSync(DB_FILE, 'utf8');
+          this.data = JSON.parse(raw);
+          return;
+        } catch (err) {
+          console.error(
+            'Error reading existing db.json, re-seeding:',
+            err
+          );
+        }
+      }
+
+      this.seed();
+      return;
     }
+
+    this.initializing = true;
+
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS fac_con_state (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          data JSONB NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+
+      const result = await pool.query(
+        'SELECT data FROM fac_con_state WHERE id = 1'
+      );
+
+      if (result.rows.length > 0) {
+        this.data = result.rows[0].data;
+        return;
+      }
+
+      // First connection: preserve existing JSON data.
+      if (fs.existsSync(DB_FILE)) {
+        try {
+          this.data = JSON.parse(
+            fs.readFileSync(DB_FILE, 'utf8')
+          );
+        } catch (err) {
+          console.error(
+            'Could not read db.json; creating seed data:',
+            err.message
+          );
+          this.data = null;
+          this.seed();
+        }
+      } else {
+        this.data = null;
+        this.seed();
+      }
+
+      await pool.query(
+        `INSERT INTO fac_con_state (id, data)
+         VALUES (1, $1::jsonb)
+         ON CONFLICT (id) DO NOTHING`,
+        [JSON.stringify(this.data)]
+      );
+
+      // Use the database's saved copy as the source of truth.
+      const saved = await pool.query(
+        'SELECT data FROM fac_con_state WHERE id = 1'
+      );
+
+      
+      this.data = saved.rows[0].data;
+    } finally {
+      this.initializing = false;
+    }
+  }
+
+  seed() {
+
+    
+
     this.seed();
   }
 
@@ -527,15 +618,65 @@ class Database {
     console.log('Database seeded successfully.');
   }
 
-  save() {
+  
+
+ 
+save() {
+  if (this.initializing) return;
+
+  const snapshot = JSON.stringify(this.data);
+
+  // Always keep the local JSON file synchronized.
+  try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    const tmp = path.join(DATA_DIR, `db.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
+
+    const tmp = path.join(
+      DATA_DIR,
+      `db.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`
+    );
+
     fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2), 'utf8');
     fs.renameSync(tmp, DB_FILE);
-    this.broadcast({ type: 'mutation', timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Local database save failed:', error.message);
+    throw error;
   }
+
+  // Also save to Neon when configured.
+  if (pool) {
+    this.pendingSave = (this.pendingSave || Promise.resolve())
+      .catch(() => {})
+      .then(() =>
+        pool.query(
+          `INSERT INTO fac_con_state (id, data, updated_at)
+           VALUES (1, $1::jsonb, NOW())
+           ON CONFLICT (id)
+           DO UPDATE SET data = EXCLUDED.data,
+                         updated_at = NOW()`,
+          [snapshot]
+        )
+      );
+
+    this.pendingSave.catch((error) => {
+      console.error('Neon save failed:', error.message);
+    });
+  }
+
+  this.broadcast({
+    type: 'mutation',
+    timestamp: new Date().toISOString()
+  });
+}
+
+
+async flush() {
+  if (this.pendingSave) {
+    await this.pendingSave;
+  }
+}
+
 
   subscribe(callback) {
     this.listeners.add(callback);

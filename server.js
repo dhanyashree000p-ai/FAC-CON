@@ -11,6 +11,17 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+
+app.use(async (req, res, next) => {
+  try {
+    await db.ready;
+    next();
+  } catch (error) {
+    console.error('Database initialization failed:', error.message);
+    res.status(503).json({ error: 'Database is not ready.' });
+  }
+});
+
 // Helper to get local network IP
 function getNetworkIps() {
   const interfaces = os.networkInterfaces();
